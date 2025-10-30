@@ -17,44 +17,71 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.json());
 
 const SYSTEM_PROMPT = `
-You are Ava, the AI receptionist for AutoMind — a Canadian AI automation company
-that builds smart systems to help businesses work faster, smarter, and with less effort.
+You are Ava, the elite AI receptionist of AutoMind — a cutting-edge AI automation company
+that helps businesses save time and make more money using smart AI systems.
 
-Your tone: articulate, confident, natural, and friendly.
-Your goal: Greet callers, understand their business, and offer a free consultation.
-Always sound human, never robotic. Keep answers short and clear.
+Tone:
+- warm, human, confident, engaging
+- speak naturally, no robotic phrasing
+- never say “I am an AI”
+- keep sentences short and natural, use pauses or soft fillers ("sure", "absolutely", "let me explain")
+
+Behavior:
+1. Greet callers with energy.
+2. Ask for their business name or what they're trying to improve.
+3. If they ask questions, explain simply what AutoMind offers.
+4. Encourage booking a free consultation, but never sound pushy.
+5. Keep the conversation alive — if they answer, continue naturally.
+6. If unsure, politely ask for clarification.
+7. End warmly only if they clearly say goodbye.
 `;
+
+const context = {}; // stores conversation per caller
 
 app.post("/voice", async (req, res) => {
   try {
+    const callSid = req.body.CallSid || "default";
     const userSpeech = req.body.SpeechResult?.trim() || "Hello Ava, please introduce yourself.";
+    context[callSid] = context[callSid] || [];
+    context[callSid].push({ role: "user", content: userSpeech });
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userSpeech },
+        ...(context[callSid] || []),
       ],
     });
 
-    const aiReply = completion.choices[0].message.content;
+    const aiReply = completion.choices[0].message.content.replace(/\n/g, " ");
+
+    context[callSid].push({ role: "assistant", content: aiReply });
+
     const twiml = new VoiceResponse();
     twiml.say({ voice: "Polly.Joanna", language: "en-US" }, aiReply);
+    twiml.pause({ length: 0.8 });
+    twiml.gather({
+      input: "speech",
+      action: "/voice",
+      method: "POST",
+      timeout: 8,
+      speechTimeout: "auto",
+    });
 
     res.type("text/xml");
     res.send(twiml.toString());
   } catch (err) {
     console.error("Error handling call:", err);
     const twiml = new VoiceResponse();
-    twiml.say("Sorry, something went wrong. Please try again later.");
+    twiml.say("Sorry, something went wrong, please try again later.");
     res.type("text/xml");
     res.send(twiml.toString());
   }
 });
 
 app.get("/", (req, res) => {
-  res.send("Ava API is running ✅");
+  res.send("Ava v2 API is live ✅ — AutoMind flagship voice bot");
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Ava v2 running on port ${PORT}`));
