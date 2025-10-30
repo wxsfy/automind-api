@@ -14,6 +14,7 @@ const openai = new OpenAI({
 
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
+app.use(express.json());
 
 const SYSTEM_PROMPT = `
 You are Ava, the AI receptionist for AutoMind — a Canadian AI automation company
@@ -26,7 +27,7 @@ Always sound human, never robotic. Keep answers short and clear.
 
 app.post("/voice", async (req, res) => {
   try {
-    const userSpeech = req.body.SpeechResult || "No speech detected";
+    const userSpeech = req.body.SpeechResult?.trim() || "Hello Ava, please introduce yourself.";
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
